@@ -233,6 +233,7 @@ Bool TComTU::isNonTransformedResidualRotated(const ComponentID compID)
 }
 
 
+
 UInt TComTU::getGolombRiceStatisticsIndex(const ComponentID compID)
 {
         TComDataCU *const pcCU             = getCU();

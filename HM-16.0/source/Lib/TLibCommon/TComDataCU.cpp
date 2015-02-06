@@ -81,6 +81,9 @@ TComDataCU::TComDataCU()
     m_crossComponentPredictionAlpha[comp] = NULL;
     m_puhTransformSkip[comp]              = NULL;
     m_pcTrCoeff[comp]                     = NULL;
+#if QP_MODIFY
+    m_pcTRTrCoeff[comp]                     = NULL;
+#endif
 #if ADAPTIVE_QP_SELECTION
     m_pcArlCoeff[comp]                    = NULL;
 #endif
@@ -171,7 +174,10 @@ Void TComDataCU::create( ChromaFormat chromaFormatIDC, UInt uiNumPartition, UInt
       m_puhCbf[compID]                        = (UChar* )xMalloc(UChar,  uiNumPartition);
       m_pcTrCoeff[compID]                     = (TCoeff*)xMalloc(TCoeff, totalSize);
       memset( m_pcTrCoeff[compID], 0, (totalSize * sizeof( TCoeff )) );
-
+#if QP_MODIFY
+      m_pcTRTrCoeff[compID]                     = (TCoeff*)xMalloc(TCoeff, totalSize);
+      memset( m_pcTRTrCoeff[compID], 0, (totalSize * sizeof( TCoeff )) );
+#endif
 #if ADAPTIVE_QP_SELECTION
       if( bGlobalRMARLBuffer )
       {
@@ -254,6 +260,9 @@ Void TComDataCU::destroy()
       if ( m_puhTransformSkip[comp]              ) { xFree(m_puhTransformSkip[comp]);              m_puhTransformSkip[comp]              = NULL; }
       if ( m_puhCbf[comp]                        ) { xFree(m_puhCbf[comp]);                        m_puhCbf[comp]                        = NULL; }
       if ( m_pcTrCoeff[comp]                     ) { xFree(m_pcTrCoeff[comp]);                     m_pcTrCoeff[comp]                     = NULL; }
+#if QP_MODIFY
+      if ( m_pcTRTrCoeff[comp]                     ) { xFree(m_pcTRTrCoeff[comp]);                     m_pcTRTrCoeff[comp]                     = NULL; }
+#endif
       if ( m_explicitRdpcmMode[comp]             ) { xFree(m_explicitRdpcmMode[comp]);             m_explicitRdpcmMode[comp]             = NULL; }
 
 #if ADAPTIVE_QP_SELECTION
@@ -451,6 +460,9 @@ Void TComDataCU::initCU( TComPic* pcPic, UInt iCUAddr )
     {
       const UInt componentShift = m_pcPic->getComponentScaleX(ComponentID(comp)) + m_pcPic->getComponentScaleY(ComponentID(comp));
       memset( m_pcTrCoeff[comp], 0, sizeof(TCoeff)* numCoeffY>>componentShift );
+#if QP_MODIFY
+      memset( m_pcTRTrCoeff[comp], 0, sizeof(TCoeff)* numCoeffY>>componentShift );
+#endif
 #if ADAPTIVE_QP_SELECTION
       memset( m_pcArlCoeff[comp], 0, sizeof(TCoeff)* numCoeffY>>componentShift );
 #endif
@@ -477,6 +489,9 @@ Void TComDataCU::initCU( TComPic* pcPic, UInt iCUAddr )
       for (UInt coeff=0; coeff<numCoeffInChannel; coeff++)
       {
         m_pcTrCoeff[comp][coeff]=pcFrom->m_pcTrCoeff[comp][coeff];
+#if QP_MODIFY
+       m_pcTRTrCoeff[comp][coeff]=pcFrom->m_pcTRTrCoeff[comp][coeff];
+#endif
 #if ADAPTIVE_QP_SELECTION
         m_pcArlCoeff[comp][coeff]=pcFrom->m_pcArlCoeff[comp][coeff];
 #endif
@@ -603,6 +618,9 @@ Void TComDataCU::initEstData( const UInt uiDepth, const Int qp, const Bool bTran
       const ComponentID component = ComponentID(comp);
       const UInt numCoeff = numCoeffY >> (getPic()->getComponentScaleX(component) + getPic()->getComponentScaleY(component));
       memset( m_pcTrCoeff[comp],    0, numCoeff * sizeof( TCoeff ) );
+#if QP_MODIFY
+      memset( m_pcTRTrCoeff[comp],    0, numCoeff * sizeof( TCoeff ) );
+#endif
 #if ADAPTIVE_QP_SELECTION
       memset( m_pcArlCoeff[comp],   0, numCoeff * sizeof( TCoeff ) );
 #endif
@@ -720,6 +738,9 @@ Void TComDataCU::initSubCU( TComDataCU* pcCU, UInt uiPartUnitIdx, UInt uiDepth, 
   {
     const UInt componentShift = m_pcPic->getComponentScaleX(ComponentID(ch)) + m_pcPic->getComponentScaleY(ComponentID(ch));
     memset( m_pcTrCoeff[ch],  0, sizeof(TCoeff)*(numCoeffY>>componentShift) );
+#if QP_MODIFY
+    memset( m_pcTRTrCoeff[ch],  0, sizeof(TCoeff)*(numCoeffY>>componentShift) );
+#endif
 #if ADAPTIVE_QP_SELECTION
     memset( m_pcArlCoeff[ch], 0, sizeof(TCoeff)*(numCoeffY>>componentShift) );
 #endif
@@ -755,6 +776,9 @@ Void TComDataCU::initSubCU( TComDataCU* pcCU, UInt uiPartUnitIdx, UInt uiDepth, 
       {
         const UInt offset = uiCoffOffset>>componentShift;
         m_pcTrCoeff[ch][coeff]=bigCU->m_pcTrCoeff[ch][coeff + offset];
+#if QP_MODIFY
+		m_pcTRTrCoeff[ch][coeff]=bigCU->m_pcTRTrCoeff[ch][coeff + offset];
+#endif
 #if ADAPTIVE_QP_SELECTION
         m_pcArlCoeff[ch][coeff]=bigCU->m_pcArlCoeff[ch][coeff + offset];
 #endif
@@ -867,6 +891,9 @@ Void TComDataCU::copySubCU( TComDataCU* pcCU, UInt uiAbsPartIdx, UInt uiDepth )
     const UInt componentShift   = m_pcPic->getComponentScaleX(component) + m_pcPic->getComponentScaleY(component);
     const UInt offset           = uiCoffOffset >> componentShift;
     m_pcTrCoeff[ch] = pcCU->getCoeff(component) + offset;
+#if QP_MODIFY
+	m_pcTRTrCoeff[ch] = pcCU->getTRCoeff(component) + offset;
+#endif
 #if ADAPTIVE_QP_SELECTION
     m_pcArlCoeff[ch] = pcCU->getArlCoeff(component) + offset;
 #endif
@@ -1000,6 +1027,9 @@ Void TComDataCU::copyPartFrom( TComDataCU* pcCU, UInt uiPartUnitIdx, UInt uiDept
     const UInt componentShift   = m_pcPic->getComponentScaleX(component) + m_pcPic->getComponentScaleY(component);
     const UInt offset           = offsetY>>componentShift;
     memcpy( m_pcTrCoeff [ch] + offset, pcCU->getCoeff(component),    sizeof(TCoeff)*(numCoeffY>>componentShift) );
+#if QP_MODIFY
+    memcpy( m_pcTRTrCoeff [ch] + offset, pcCU->getTRCoeff(component),    sizeof(TCoeff)*(numCoeffY>>componentShift) );
+#endif
 #if ADAPTIVE_QP_SELECTION
     memcpy( m_pcArlCoeff[ch] + offset, pcCU->getArlCoeff(component), sizeof(TCoeff)*(numCoeffY>>componentShift) );
 #endif
@@ -1079,6 +1109,9 @@ Void TComDataCU::copyToPic( UChar uhDepth )
     const ComponentID component = ComponentID(comp);
     const UInt componentShift   = m_pcPic->getComponentScaleX(component) + m_pcPic->getComponentScaleY(component);
     memcpy( rpcCU->getCoeff(component)   + (offsetY>>componentShift), m_pcTrCoeff[component], sizeof(TCoeff)*(numCoeffY>>componentShift) );
+#if QP_MODIFY
+	memcpy( rpcCU->getTRCoeff(component)   + (offsetY>>componentShift), m_pcTRTrCoeff[component], sizeof(TCoeff)*(numCoeffY>>componentShift) );
+#endif
 #if ADAPTIVE_QP_SELECTION
     memcpy( rpcCU->getArlCoeff(component) + (offsetY>>componentShift), m_pcArlCoeff[component], sizeof(TCoeff)*(numCoeffY>>componentShift) );
 #endif
@@ -1159,6 +1192,9 @@ Void TComDataCU::copyToPic( UChar uhDepth, UInt uiPartIdx, UInt uiPartDepth )
   {
     UInt componentShift = m_pcPic->getComponentScaleX(ComponentID(comp)) + m_pcPic->getComponentScaleY(ComponentID(comp));
     memcpy( rpcCU->getCoeff(ComponentID(comp)) + (offsetY>>componentShift), m_pcTrCoeff[comp], sizeof(TCoeff)*(numCoeffY>>componentShift) );
+#if QP_MODIFY
+	memcpy( rpcCU->getTRCoeff(ComponentID(comp)) + (offsetY>>componentShift), m_pcTRTrCoeff[comp], sizeof(TCoeff)*(numCoeffY>>componentShift) );
+#endif
 #if ADAPTIVE_QP_SELECTION
     memcpy( rpcCU->getArlCoeff(ComponentID(comp)) + (offsetY>>componentShift), m_pcArlCoeff[comp], sizeof(TCoeff)*(numCoeffY>>componentShift) );
 #endif

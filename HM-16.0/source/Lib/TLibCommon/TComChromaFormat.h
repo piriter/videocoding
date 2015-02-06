@@ -269,7 +269,15 @@ static inline UInt getCBFContextOffset (const ComponentID component)
 Void getTUEntropyCodingParameters(      TUEntropyCodingParameters &result,
                                   class TComTU                    &rTu,
                                   const ComponentID                component);
-
+#if QP_MODIFY
+Void getTUEntropyCodingParameters_MODIFY(      TUEntropyCodingParameters &result,
+                                         TComDataCU*& rpcCU,
+								  const UInt		CUListIndex,	
+								  const UInt		TUDepth,
+                                  const ComponentID                component);
+extern UInt g_ListIndexInc[TOTALDEPTH];
+extern UInt g_ListDepthSize[PIMAXCOMPONENT][TOTALDEPTH];
+#endif
 
 //======================================================================================================================
 //End  =================================================================================================================

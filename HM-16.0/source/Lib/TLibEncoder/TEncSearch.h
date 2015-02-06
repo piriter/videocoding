@@ -70,8 +70,12 @@ class TEncSearch : public TComPrediction
 private:
   TCoeff**        m_ppcQTTempCoeff[MAX_NUM_COMPONENT /* 0->Y, 1->Cb, 2->Cr*/];
   TCoeff*         m_pcQTTempCoeff[MAX_NUM_COMPONENT];
+#if QP_MODIFY
+  TCoeff**        m_ppcTRTempCoeff[MAX_NUM_COMPONENT /* 0->Y, 1->Cb, 2->Cr*/];
+  TCoeff*         m_pcTRTempCoeff[MAX_NUM_COMPONENT];
+#endif
 #if ADAPTIVE_QP_SELECTION
-  TCoeff**        m_ppcQTTempArlCoeff[MAX_NUM_COMPONENT];
+  TCoeff**        m_ppcQTTempArlCoeff[MAX_NUM_COMPONENT];//inter varialbles
   TCoeff*         m_pcQTTempArlCoeff[MAX_NUM_COMPONENT];
 #endif
   UChar*          m_puhQTTempTrIdx;
@@ -82,7 +86,10 @@ private:
 
   Char*           m_phQTTempCrossComponentPredictionAlpha[MAX_NUM_COMPONENT];
   Pel*            m_pSharedPredTransformSkip[MAX_NUM_COMPONENT];
-  TCoeff*         m_pcQTTempTUCoeff[MAX_NUM_COMPONENT];
+  TCoeff*         m_pcQTTempTUCoeff[MAX_NUM_COMPONENT];           //intra variables
+#if QP_MODIFY
+  TCoeff*         m_pcTRTempTUCoeff[MAX_NUM_COMPONENT];
+#endif
   UChar*          m_puhQTTempTransformSkipFlag[MAX_NUM_COMPONENT];
   TComYuv         m_pcQTTempTransformSkipTComYuv;
 #if ADAPTIVE_QP_SELECTION
@@ -137,7 +144,19 @@ public:
             TComRdCost*   pcRdCost,
             TEncSbac***   pppcRDSbacCoder,
             TEncSbac*     pcRDGoOnSbacCoder );
-
+#if QP_MODIFY
+  Void xEstimateBitRate(  TComDataCU* &pcCU,
+						  TCoeff      *currentCoefficients,
+						  UInt    uiWidth,
+						  UInt    uiHeight,
+						  UInt    uiAbsPartIdx,  //TULIstIndex
+						  UInt    CUListIndex,
+//						  UInt    TUDepth,
+						  UInt        uiDepth,    //Total Depth
+				   const  ComponentID  compID,
+						  UInt         &currCompBits
+                                      );
+#endif
 protected:
 
   /// sub-function for motion vector refinement used in fractional-pel accuracy
@@ -457,7 +476,9 @@ protected:
   Void xEncodeResidualQT( const ComponentID compID, TComTU &rTu );
   Void xEstimateResidualQT( TComYuv* pcResi, Double &rdCost, UInt &ruiBits, Distortion &ruiDist, Distortion *puiZeroDist, TComTU &rTu DEBUG_STRING_FN_DECLARE(sDebug) );
   Void xSetResidualQTData( TComYuv* pcResi, Bool bSpatial, TComTU &rTu  );
-
+#if QP_MODIFY
+  Void xSetResidualTRData( TComYuv* pcResi, Bool bSpatial, TComTU &rTu  );
+#endif
   UInt  xModeBitsIntra ( TComDataCU* pcCU, UInt uiMode, UInt uiPartOffset, UInt uiDepth, UInt uiInitTrDepth, const ChannelType compID );
   UInt  xUpdateCandList( UInt uiMode, Double uiCost, UInt uiFastCandNum, UInt * CandModeList, Double * CandCostList );
 

@@ -680,6 +680,20 @@ Void TEncEntropy::encodeCoeff( TComDataCU* pcCU, UInt uiAbsPartIdx, UInt uiDepth
   xEncodeTransform( bCodeDQP, codeChromaQpAdj, tuRecurse );
 }
 
+#if QP_MODIFY
+Void TEncEntropy::encodeCoeffNxN_MODIFY  (   TComDataCU* &pcCU, 
+								  TCoeff* pcCoef, 
+								  UInt    uiWidth,
+								  UInt    uiHeight,
+								  UInt    uiAbsPartIdx,  //TULIstIndex
+								  UInt    CUListIndex,
+								  UInt    TUDepth,      //TotalDepth
+							const ComponentID compID )
+{
+	m_pcEntropyCoderIf->codeCoeffNxN_MODIFY(pcCU, pcCoef, uiWidth,uiHeight,uiAbsPartIdx,CUListIndex,TUDepth,compID);
+}
+#endif
+
 Void TEncEntropy::encodeCoeffNxN( TComTU &rTu, TCoeff* pcCoef, const ComponentID compID)
 {
   TComDataCU *pcCU = rTu.getCU();

@@ -253,6 +253,11 @@ UInt g_auiRasterToPelY  [ MAX_NUM_SPU_W*MAX_NUM_SPU_W ] = { 0, };
 
 UInt g_auiPUOffset[NUMBER_OF_PART_SIZES] = { 0, 8, 4, 4, 2, 10, 1, 5};
 
+#if QP_MODIFY
+UInt g_ListIndexInc[TOTALDEPTH]={256,64,16,4,1};     //16*16,8*8,4*4,2*2,1*1
+UInt g_ListDepthSize[PIMAXCOMPONENT][TOTALDEPTH]={{64,32,16,8,4},{32,16,8,4,4},{32,16,8,4,4}};
+#endif
+
 Void initZscanToRaster ( Int iMaxDepth, Int iDepth, UInt uiStartVal, UInt*& rpuiCurrIdx )
 {
   Int iStride = 1 << ( iMaxDepth - 1 );

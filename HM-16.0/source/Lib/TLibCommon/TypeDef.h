@@ -302,6 +302,18 @@
 
 #define MAX_TIMECODE_SEI_SETS                                                  3 ///< Maximum number of time sets
 
+#define QP_FLUCT															   0 //piriter
+
+#define QP_MODIFY															   1 //piriter
+#define DEBUG_PIRITER														   0 //piriter
+
+#if QP_MODIFY
+
+#define MAXDEPTH  4
+#define TOTALDEPTH 5
+#define PIMAXCOMPONENT 3
+
+#endif
 //------------------------------------------------
 // Error checks
 //------------------------------------------------

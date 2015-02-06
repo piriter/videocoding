@@ -1225,6 +1225,386 @@ Void TEncSbac::codeLastSignificantXY( UInt uiPosX, UInt uiPosY, Int width, Int h
   }
 }
 
+#if QP_MODIFY
+Void TEncSbac::codeCoeffNxN_MODIFY (TComDataCU* &pcCU, 
+								  TCoeff* pcCoef, 
+								  UInt    uiWidth,
+								  UInt    uiHeight,
+								  UInt    uiAbsPartIdx,  //TULIstIndex
+								  UInt    CUListIndex,
+								  UInt    TUDepth,
+							const ComponentID compID )
+{
+//	  TComDataCU* pcCU=rTu.getCU();
+//  const UInt uiAbsPartIdx=rTu.GetAbsPartIdxTU(compID);
+//  const TComRectangle &tuRect=rTu.getRect(compID);
+//  const UInt uiWidth=tuRect.width;
+//  const UInt uiHeight=tuRect.height;
+/*
+  DTRACE_CABAC_VL( g_nSymbolCounter++ )
+  DTRACE_CABAC_T( "\tparseCoeffNxN()\teType=" )
+  DTRACE_CABAC_V( compID )
+  DTRACE_CABAC_T( "\twidth=" )
+  DTRACE_CABAC_V( uiWidth )
+  DTRACE_CABAC_T( "\theight=" )
+  DTRACE_CABAC_V( uiHeight )
+  DTRACE_CABAC_T( "\tdepth=" )
+//  DTRACE_CABAC_V( rTu.GetTransformDepthTotalAdj(compID) )
+  DTRACE_CABAC_V( rTu.GetTransformDepthTotal() )
+  DTRACE_CABAC_T( "\tabspartidx=" )
+//  DTRACE_CABAC_V( uiAbsPartIdx )
+  DTRACE_CABAC_T( "\ttoCU-X=" )
+  DTRACE_CABAC_V( pcCU->getCUPelX() )
+  DTRACE_CABAC_T( "\ttoCU-Y=" )
+  DTRACE_CABAC_V( pcCU->getCUPelY() )
+  DTRACE_CABAC_T( "\tCU-addr=" )
+  DTRACE_CABAC_V(  pcCU->getAddr() )
+  DTRACE_CABAC_T( "\tinCU-X=" )
+//  DTRACE_CABAC_V( g_auiRasterToPelX[ g_auiZscanToRaster[uiAbsPartIdx] ] )
+  DTRACE_CABAC_V( g_auiRasterToPelX[ g_auiZscanToRaster[rTu.GetAbsPartIdxTU(compID)] ] )
+  DTRACE_CABAC_T( "\tinCU-Y=" )
+// DTRACE_CABAC_V( g_auiRasterToPelY[ g_auiZscanToRaster[uiAbsPartIdx] ] )
+  DTRACE_CABAC_V( g_auiRasterToPelY[ g_auiZscanToRaster[rTu.GetAbsPartIdxTU(compID)] ] )
+  DTRACE_CABAC_T( "\tpredmode=" )
+  DTRACE_CABAC_V(  pcCU->getPredictionMode( uiAbsPartIdx ) )
+  DTRACE_CABAC_T( "\n" )
+*/
+  //--------------------------------------------------------------------------------------------------
+
+  if( uiWidth > m_pcSlice->getSPS()->getMaxTrSize() )
+  {
+    std::cerr << "ERROR: codeCoeffNxN was passed a TU with dimensions larger than the maximum allowed size" << std::endl;
+    assert(false);
+    exit(1);
+  }
+
+  // compute number of significant coefficients
+  UInt uiNumSig = TEncEntropy::countNonZeroCoeffs(pcCoef, uiWidth * uiHeight);
+
+  if ( uiNumSig == 0 )
+  {
+    std::cerr << "ERROR: codeCoeffNxN called for empty TU!" << std::endl;
+    assert(false);
+    exit(1);
+  }
+
+  //--------------------------------------------------------------------------------------------------
+
+  //set parameters
+
+  const ChannelType  chType            = toChannelType(compID);
+  const UInt         uiLog2BlockWidth  = g_aucConvertToBit[ uiWidth  ] + 2;
+  const UInt         uiLog2BlockHeight = g_aucConvertToBit[ uiHeight ] + 2;
+
+  const ChannelType  channelType       = toChannelType(compID);
+  const Bool         extendedPrecision = pcCU->getSlice()->getSPS()->getUseExtendedPrecision();
+
+  const Bool         alignCABACBeforeBypass = pcCU->getSlice()->getSPS()->getAlignCABACBeforeBypass();
+
+  Bool beValid;
+
+  {
+    Int uiIntraMode = -1;
+    const Bool       bIsLuma = isLuma(compID);
+    Int isIntra = pcCU->isIntra(uiAbsPartIdx) ? 1 : 0;
+    if ( isIntra )
+    {
+      uiIntraMode = pcCU->getIntraDir( toChannelType(compID), uiAbsPartIdx );
+
+//    uiIntraMode = (uiIntraMode==DM_CHROMA_IDX && !bIsLuma) ? pcCU->getIntraDir(CHANNEL_TYPE_LUMA, getChromasCorrespondingPULumaIdx(uiAbsPartIdx, rTu.GetChromaFormat())) : uiIntraMode;
+	  uiIntraMode = (uiIntraMode==DM_CHROMA_IDX && !bIsLuma) ? pcCU->getIntraDir(CHANNEL_TYPE_LUMA, getChromasCorrespondingPULumaIdx(uiAbsPartIdx, CHROMA_420)) : uiIntraMode;
+//      uiIntraMode = ((rTu.GetChromaFormat() == CHROMA_422) && !bIsLuma) ? g_chroma422IntraAngleMappingTable[uiIntraMode] : uiIntraMode;
+	 uiIntraMode = ((CHROMA_420 == CHROMA_422) && !bIsLuma) ? g_chroma422IntraAngleMappingTable[uiIntraMode] : uiIntraMode;
+    }
+
+    Int transformSkip = pcCU->getTransformSkip( uiAbsPartIdx,compID) ? 1 : 0;
+    Bool rdpcm_lossy = ( transformSkip && isIntra && ( (uiIntraMode == HOR_IDX) || (uiIntraMode == VER_IDX) ) ) && pcCU->isRDPCMEnabled(uiAbsPartIdx);
+
+    if ( (pcCU->getCUTransquantBypass(uiAbsPartIdx)) || rdpcm_lossy )
+    {
+      beValid = false;
+//      if ( (!pcCU->isIntra(uiAbsPartIdx)) && pcCU->isRDPCMEnabled(uiAbsPartIdx))
+//        codeExplicitRdpcmMode( rTu, compID);
+    }
+    else
+    {
+      beValid = pcCU->getSlice()->getPPS()->getSignHideFlag() > 0;
+    }
+  }
+
+  //--------------------------------------------------------------------------------------------------
+/*
+  if(pcCU->getSlice()->getPPS()->getUseTransformSkip())
+  {
+    codeTransformSkipFlags(rTu, compID);
+    if(pcCU->getTransformSkip(uiAbsPartIdx, compID) && !pcCU->isIntra(uiAbsPartIdx) && pcCU->isRDPCMEnabled(uiAbsPartIdx))
+    {
+      //  This TU has coefficients and is transform skipped. Check whether is inter coded and if yes encode the explicit RDPCM mode
+      codeExplicitRdpcmMode( rTu, compID);
+
+      if(pcCU->getExplicitRdpcmMode(compID, uiAbsPartIdx) != RDPCM_OFF)
+      {
+        //  Sign data hiding is avoided for horizontal and vertical explicit RDPCM modes
+        beValid = false;
+      }
+    }
+  }
+*/
+  //--------------------------------------------------------------------------------------------------
+#if QP_MODIFY
+  const Bool              transformSkip    = pcCU->getTransformSkip(uiAbsPartIdx, compID);
+  const Bool              transquantBypass = pcCU->getCUTransquantBypass(uiAbsPartIdx);
+
+  //--------
+
+  const UInt channelTypeOffset    =  isChroma(compID)                   ? 2 : 0;
+  const UInt nonTransformedOffset = (transformSkip || transquantBypass) ? 1 : 0;
+
+  //--------
+
+  const UInt selectedIndex = channelTypeOffset + nonTransformedOffset;
+  assert(selectedIndex < RExt__GOLOMB_RICE_ADAPTATION_STATISTICS_SETS);
+#endif
+  const Bool  bUseGolombRiceParameterAdaptation = pcCU->getSlice()->getSPS()->getUseGolombRiceParameterAdaptation();
+//        UInt &currentGolombRiceStatistic        = m_golombRiceAdaptationStatistics[rTu.getGolombRiceStatisticsIndex(compID)];
+   UInt &currentGolombRiceStatistic        = m_golombRiceAdaptationStatistics[selectedIndex];
+
+  //select scans
+  TUEntropyCodingParameters codingParameters;
+//  getTUEntropyCodingParameters(codingParameters, rTu, compID);
+  getTUEntropyCodingParameters_MODIFY(codingParameters,pcCU,CUListIndex,TUDepth,compID);
+
+  //----- encode significance map -----
+
+  // Find position of last coefficient
+  Int scanPosLast = -1;
+  Int posLast;
+
+
+  UInt uiSigCoeffGroupFlag[ MLS_GRP_NUM ];
+
+  ::memset( uiSigCoeffGroupFlag, 0, sizeof(UInt) * MLS_GRP_NUM );
+  do
+  {
+    posLast = codingParameters.scan[ ++scanPosLast ];
+
+    if( pcCoef[ posLast ] != 0 )
+    {
+      // get L1 sig map
+      UInt uiPosY   = posLast >> uiLog2BlockWidth;
+      UInt uiPosX   = posLast - ( uiPosY << uiLog2BlockWidth );
+
+      UInt uiBlkIdx = (codingParameters.widthInGroups * (uiPosY >> MLS_CG_LOG2_HEIGHT)) + (uiPosX >> MLS_CG_LOG2_WIDTH);
+      uiSigCoeffGroupFlag[ uiBlkIdx ] = 1;
+
+      uiNumSig--;
+    }
+  }
+  while ( uiNumSig > 0 );
+
+  // Code position of last coefficient
+  Int posLastY = posLast >> uiLog2BlockWidth;
+  Int posLastX = posLast - ( posLastY << uiLog2BlockWidth );
+  codeLastSignificantXY(posLastX, posLastY, uiWidth, uiHeight, compID, codingParameters.scanType);
+
+  //===== code significance flag =====
+  ContextModel * const baseCoeffGroupCtx = m_cCUSigCoeffGroupSCModel.get( 0, chType );
+  ContextModel * const baseCtx = m_cCUSigSCModel.get( 0, 0 ) + getSignificanceMapContextOffset(compID);
+
+  const Int  iLastScanSet  = scanPosLast >> MLS_CG_SIZE;
+
+  UInt c1                  = 1;
+  UInt uiGoRiceParam       = 0;
+  Int  iScanPosSig         = scanPosLast;
+
+  for( Int iSubSet = iLastScanSet; iSubSet >= 0; iSubSet-- )
+  {
+    Int numNonZero = 0;
+    Int  iSubPos   = iSubSet << MLS_CG_SIZE;
+    uiGoRiceParam  = currentGolombRiceStatistic / RExt__GOLOMB_RICE_INCREMENT_DIVISOR;
+    Bool updateGolombRiceStatistics = bUseGolombRiceParameterAdaptation; //leave the statistics at 0 when not using the adaptation system
+    UInt coeffSigns = 0;
+
+    Int absCoeff[1 << MLS_CG_SIZE];
+
+    Int lastNZPosInCG  = -1;
+    Int firstNZPosInCG = 1 << MLS_CG_SIZE;
+
+    Bool escapeDataPresentInGroup = false;
+
+    if( iScanPosSig == scanPosLast )
+    {
+      absCoeff[ 0 ] = Int(abs( pcCoef[ posLast ] ));
+      coeffSigns    = ( pcCoef[ posLast ] < 0 );
+      numNonZero    = 1;
+      lastNZPosInCG  = iScanPosSig;
+      firstNZPosInCG = iScanPosSig;
+      iScanPosSig--;
+    }
+
+    // encode significant_coeffgroup_flag
+    Int iCGBlkPos = codingParameters.scanCG[ iSubSet ];
+    Int iCGPosY   = iCGBlkPos / codingParameters.widthInGroups;
+    Int iCGPosX   = iCGBlkPos - (iCGPosY * codingParameters.widthInGroups);
+
+    if( iSubSet == iLastScanSet || iSubSet == 0)
+    {
+      uiSigCoeffGroupFlag[ iCGBlkPos ] = 1;
+    }
+    else
+    {
+      UInt uiSigCoeffGroup   = (uiSigCoeffGroupFlag[ iCGBlkPos ] != 0);
+      UInt uiCtxSig  = TComTrQuant::getSigCoeffGroupCtxInc( uiSigCoeffGroupFlag, iCGPosX, iCGPosY, codingParameters.widthInGroups, codingParameters.heightInGroups );
+      m_pcBinIf->encodeBin( uiSigCoeffGroup, baseCoeffGroupCtx[ uiCtxSig ] );
+    }
+
+    // encode significant_coeff_flag
+    if( uiSigCoeffGroupFlag[ iCGBlkPos ] )
+    {
+      const Int patternSigCtx = TComTrQuant::calcPatternSigCtx(uiSigCoeffGroupFlag, iCGPosX, iCGPosY, codingParameters.widthInGroups, codingParameters.heightInGroups);
+
+      UInt uiBlkPos, uiSig, uiCtxSig;
+      for( ; iScanPosSig >= iSubPos; iScanPosSig-- )
+      {
+        uiBlkPos  = codingParameters.scan[ iScanPosSig ];
+        uiSig     = (pcCoef[ uiBlkPos ] != 0);
+        if( iScanPosSig > iSubPos || iSubSet == 0 || numNonZero )
+        {
+          uiCtxSig  = TComTrQuant::getSigCtxInc( patternSigCtx, codingParameters, iScanPosSig, uiLog2BlockWidth, uiLog2BlockHeight, chType );
+          m_pcBinIf->encodeBin( uiSig, baseCtx[ uiCtxSig ] );
+        }
+        if( uiSig )
+        {
+          absCoeff[ numNonZero ] = Int(abs( pcCoef[ uiBlkPos ] ));
+          coeffSigns = 2 * coeffSigns + ( pcCoef[ uiBlkPos ] < 0 );
+          numNonZero++;
+          if( lastNZPosInCG == -1 )
+          {
+            lastNZPosInCG = iScanPosSig;
+          }
+          firstNZPosInCG = iScanPosSig;
+        }
+      }
+    }
+    else
+    {
+      iScanPosSig = iSubPos - 1;
+    }
+
+    if( numNonZero > 0 )
+    {
+      Bool signHidden = ( lastNZPosInCG - firstNZPosInCG >= SBH_THRESHOLD );
+
+      const UInt uiCtxSet = getContextSetIndex(compID, iSubSet, (c1 == 0));
+      c1 = 1;
+
+      ContextModel *baseCtxMod = m_cCUOneSCModel.get( 0, 0 ) + (NUM_ONE_FLAG_CTX_PER_SET * uiCtxSet);
+
+      Int numC1Flag = min(numNonZero, C1FLAG_NUMBER);
+      Int firstC2FlagIdx = -1;
+      for( Int idx = 0; idx < numC1Flag; idx++ )
+      {
+        UInt uiSymbol = absCoeff[ idx ] > 1;
+        m_pcBinIf->encodeBin( uiSymbol, baseCtxMod[c1] );
+        if( uiSymbol )
+        {
+          c1 = 0;
+
+          if (firstC2FlagIdx == -1)
+          {
+            firstC2FlagIdx = idx;
+          }
+          else //if a greater-than-one has been encountered already this group
+          {
+            escapeDataPresentInGroup = true;
+          }
+        }
+        else if( (c1 < 3) && (c1 > 0) )
+        {
+          c1++;
+        }
+      }
+
+      if (c1 == 0)
+      {
+        baseCtxMod = m_cCUAbsSCModel.get( 0, 0 ) + (NUM_ABS_FLAG_CTX_PER_SET * uiCtxSet);
+        if ( firstC2FlagIdx != -1)
+        {
+          UInt symbol = absCoeff[ firstC2FlagIdx ] > 2;
+          m_pcBinIf->encodeBin( symbol, baseCtxMod[0] );
+          if (symbol != 0)
+          {
+            escapeDataPresentInGroup = true;
+          }
+        }
+      }
+
+      escapeDataPresentInGroup = escapeDataPresentInGroup || (numNonZero > C1FLAG_NUMBER);
+
+      if (escapeDataPresentInGroup && alignCABACBeforeBypass)
+      {
+        m_pcBinIf->align();
+      }
+
+      if( beValid && signHidden )
+      {
+        m_pcBinIf->encodeBinsEP( (coeffSigns >> 1), numNonZero-1 );
+      }
+      else
+      {
+        m_pcBinIf->encodeBinsEP( coeffSigns, numNonZero );
+      }
+
+      Int iFirstCoeff2 = 1;
+      if (escapeDataPresentInGroup)
+      {
+        for ( Int idx = 0; idx < numNonZero; idx++ )
+        {
+          UInt baseLevel  = (idx < C1FLAG_NUMBER)? (2 + iFirstCoeff2 ) : 1;
+
+          if( absCoeff[ idx ] >= baseLevel)
+          {
+            const UInt escapeCodeValue = absCoeff[idx] - baseLevel;
+
+            xWriteCoefRemainExGolomb( escapeCodeValue, uiGoRiceParam, extendedPrecision, channelType );
+
+            if (absCoeff[idx] > (3 << uiGoRiceParam))
+            {
+              uiGoRiceParam = bUseGolombRiceParameterAdaptation ? (uiGoRiceParam + 1) : (std::min<UInt>((uiGoRiceParam + 1), 4));
+            }
+
+            if (updateGolombRiceStatistics)
+            {
+              const UInt initialGolombRiceParameter = currentGolombRiceStatistic / RExt__GOLOMB_RICE_INCREMENT_DIVISOR;
+
+              if (escapeCodeValue >= (3 << initialGolombRiceParameter))
+              {
+                currentGolombRiceStatistic++;
+              }
+              else if (((escapeCodeValue * 2) < (1 << initialGolombRiceParameter)) && (currentGolombRiceStatistic > 0))
+              {
+                currentGolombRiceStatistic--;
+              }
+
+              updateGolombRiceStatistics = false;
+            }
+          }
+
+          if(absCoeff[ idx ] >= 2)
+          {
+            iFirstCoeff2 = 0;
+          }
+        }
+      }
+    }
+  }
+#if RExt__ENVIRONMENT_VARIABLE_DEBUG_AND_TEST
+  printSBACCoeffData(posLastX, posLastY, uiWidth, uiHeight, compID, uiAbsPartIdx, codingParameters.scanType, pcCoef, g_bFinalEncode);
+#endif
+
+  return;
+}
+#endif
 
 Void TEncSbac::codeCoeffNxN( TComTU &rTu, TCoeff* pcCoef, const ComponentID compID )
 {

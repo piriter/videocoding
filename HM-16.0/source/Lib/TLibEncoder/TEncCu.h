@@ -57,6 +57,9 @@ class TEncSbac;
 class TEncCavlc;
 class TEncSlice;
 
+#if QP_MODIFY
+extern UInt g_ListIndexInc[TOTALDEPTH];
+#endif
 // ====================================================================================================================
 // Class definition
 // ====================================================================================================================
@@ -77,6 +80,9 @@ private:
   TComYuv**               m_ppcResiYuvTemp; ///< Temporary Residual Yuv for each depth
   TComYuv**               m_ppcRecoYuvTemp; ///< Temporary Reconstruction Yuv for each depth
   TComYuv**               m_ppcOrigYuv;     ///< Original Yuv for each depth
+#if QP_MODIFY
+//  TComYuv*				  m_pBestPredYuvBest; //piriter
+#endif
 
   //  Data : encoder control
   Bool                    m_bEncodeDQP;
@@ -127,6 +133,20 @@ protected:
 #else
   Void  xCompressCU         ( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt uiDepth        );
 #endif
+
+#if QP_MODIFY
+  Void  xCuQPSel			( TComDataCU*& rpcBestCU );
+  Void  xperQPSelCu         (      TComDataCU*& rpcBestCU,
+						     const UInt         numValidComp,
+								   Double*      uiCompTotalCost
+							 );
+  Void xUpdateCUContent     (TComDataCU*& rpcBestCU,const UInt numValidComp);
+#endif
+
+#if QP_FLUCT
+  Void  xCompressCUQP         ( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU,TComDataCU*& rpcBaseQPCU, UInt uiDepth DEBUG_STRING_FN_DECLARE(sDebug), PartSize eParentPartSize = NUMBER_OF_PART_SIZES );
+#endif
+
   Void  xEncodeCU           ( TComDataCU*  pcCU, UInt uiAbsPartIdx,           UInt uiDepth        );
 
   Int   xComputeQP          ( TComDataCU* pcCU, UInt uiDepth );

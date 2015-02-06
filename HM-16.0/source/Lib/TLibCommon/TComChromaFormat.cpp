@@ -74,6 +74,71 @@ std::string getListOfColourSpaceConverts(const Bool bIsForward)
 
 
 //----------------------------------------------------------------------------------------------------------------------
+#if QP_MODIFY
+Void getTUEntropyCodingParameters_MODIFY(    TUEntropyCodingParameters &result,
+                                         TComDataCU*& rpcCU,
+								  const UInt		CUListIndex,	
+								  const UInt		TUDepth,          //TotalDepth
+                                  const ComponentID                component)
+{
+	 //------------------------------------------------
+
+  //set the local parameters
+
+        TComDataCU    *const pcCU            = rpcCU;
+		TComRectangle       area;
+		area.width=g_ListDepthSize[component][TUDepth];
+		area.height=g_ListDepthSize[component][TUDepth];
+  const UInt                 uiAbsPartIdx    = CUListIndex;
+  const UInt                 log2BlockWidth  = g_aucConvertToBit[area.width]  + 2;
+  const UInt                 log2BlockHeight = g_aucConvertToBit[area.height] + 2;
+  const ChannelType          channelType     = toChannelType(component);
+
+  result.scanType = COEFF_SCAN_TYPE(pcCU->getCoefScanIdx(uiAbsPartIdx, area.width, area.height, component));
+
+  //------------------------------------------------
+
+  //set the group layout
+
+  result.widthInGroups  = area.width  >> MLS_CG_LOG2_WIDTH;
+  result.heightInGroups = area.height >> MLS_CG_LOG2_HEIGHT;
+
+  //------------------------------------------------
+
+  //set the scan orders
+
+  const UInt log2WidthInGroups  = g_aucConvertToBit[result.widthInGroups  * 4];
+  const UInt log2HeightInGroups = g_aucConvertToBit[result.heightInGroups * 4];
+
+  result.scan   = g_scanOrder[ SCAN_GROUPED_4x4 ][ result.scanType ][ log2BlockWidth    ][ log2BlockHeight    ];
+  result.scanCG = g_scanOrder[ SCAN_UNGROUPED   ][ result.scanType ][ log2WidthInGroups ][ log2HeightInGroups ];
+
+  //------------------------------------------------
+
+  //set the significance map context selection parameters
+  
+    if ((area.width == 4) && (area.height == 4))
+    {
+      result.firstSignificanceMapContext = significanceMapContextSetStart[channelType][CONTEXT_TYPE_4x4];
+    }
+    else if ((area.width == 8) && (area.height == 8))
+    {
+      result.firstSignificanceMapContext = significanceMapContextSetStart[channelType][CONTEXT_TYPE_8x8];
+      if (result.scanType != SCAN_DIAG) result.firstSignificanceMapContext += nonDiagonalScan8x8ContextOffset[channelType];
+    }
+    else
+    {
+      result.firstSignificanceMapContext = significanceMapContextSetStart[channelType][CONTEXT_TYPE_NxN];
+    }
+  
+
+  //------------------------------------------------
+
+}
+#endif
+
+
+
 
 Void getTUEntropyCodingParameters(      TUEntropyCodingParameters &result,
                                         TComTU                    &rTu,

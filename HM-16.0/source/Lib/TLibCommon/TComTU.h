@@ -135,6 +135,7 @@ class TComTU
     Bool isNonTransformedResidualRotated(const ComponentID compID);
 
     UInt getGolombRiceStatisticsIndex(const ComponentID compID);
+
 };
 
 

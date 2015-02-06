@@ -108,6 +108,16 @@ public:
   virtual Void codeDeltaQP       ( TComDataCU* pcCU, UInt uiAbsPartIdx ) = 0;
   virtual Void codeChromaQpAdjustment( TComDataCU* pcCU, UInt uiAbsPartIdx ) = 0;
   virtual Void codeCoeffNxN      ( TComTU &rTu, TCoeff* pcCoef, const ComponentID compID ) = 0;
+#if QP_MODIFY
+  virtual Void codeCoeffNxN_MODIFY (TComDataCU* &pcCU, 
+								  TCoeff* pcCoef, 
+								  UInt    uiWidth,
+								  UInt    uiHeight,
+								  UInt    uiAbsPartIdx,  
+								  UInt    CUListIndex,
+								  UInt    TUDepth,
+							const ComponentID compID )=0;
+#endif
   virtual Void codeTransformSkipFlags ( TComTU &rTu, ComponentID component ) = 0;
   virtual Void codeSAOBlkParam   (SAOBlkParam& saoBlkParam, Bool* sliceEnabled, Bool leftMergeAvail, Bool aboveMergeAvail, Bool onlyEstMergeInfo = false)    =0;
   virtual Void estBit               (estBitsSbacStruct* pcEstBitsSbac, Int width, Int height, ChannelType chType) = 0;
@@ -187,6 +197,16 @@ public:
   Void encodeCoeff             ( TComDataCU* pcCU, UInt uiAbsPartIdx, UInt uiDepth, Bool& bCodeDQP, Bool& codeChromaQpAdj );
 
   Void encodeCoeffNxN         ( TComTU &rTu, TCoeff* pcCoef, const ComponentID compID );
+#if QP_MODIFY
+  Void encodeCoeffNxN_MODIFY  (   TComDataCU* &pcCU, 
+								  TCoeff* pcCoef, 
+								  UInt    uiWidth,
+								  UInt    uiHeight,
+								  UInt    uiAbsPartIdx,  //TULIstIndex
+								  UInt    CUListIndex,
+								  UInt    TUDepth,
+							const ComponentID compID );
+#endif
 
   Void estimateBit             ( estBitsSbacStruct* pcEstBitsSbac, Int width, Int height, ChannelType chType );
 

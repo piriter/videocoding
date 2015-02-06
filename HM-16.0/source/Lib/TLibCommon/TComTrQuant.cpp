@@ -1083,6 +1083,61 @@ Void TComTrQuant::signBitHidingHDQ( const ComponentID compID, TCoeff* pQCoef, TC
   return;
 }
 
+#if QP_MODIFY
+Void TComTrQuant::xQuant_MODIFY(       TComDataCU*& rpcCU,
+                                       TCoeff      * pSrc,
+								       TCoeff      * pDes,
+							           TCoeff       &uiAbsSum,
+							     const UInt		CUListIndex,	
+						     	 const UInt		TUDepth,        //TUDepth=FirstCUDepth+FirstTUDepth
+							     const ComponentID   compID,
+								 const QpParam      &cQP )
+{
+	const UInt uiWidth        = g_ListDepthSize[compID][TUDepth];
+    const UInt uiHeight       = g_ListDepthSize[compID][TUDepth];
+	TCoeff* piCoef    = pSrc;
+    TCoeff* piQCoef   = pDes;
+
+	TUEntropyCodingParameters codingParameters;
+	getTUEntropyCodingParameters_MODIFY(codingParameters,rpcCU,CUListIndex,TUDepth,compID);
+	
+	const TCoeff entropyCodingMinimum = -(1 << g_maxTrDynamicRange[toChannelType(compID)]);
+    const TCoeff entropyCodingMaximum =  (1 << g_maxTrDynamicRange[toChannelType(compID)]) - 1;
+
+	TCoeff deltaU[MAX_TU_SIZE * MAX_TU_SIZE];
+	
+	const UInt uiLog2TrSize=g_aucConvertToBit[uiHeight]+2;   //TUsize.height+2  compID的问题 luma是4*4的话，chroma是4*4
+	
+	Int iTransformShift = getTransformShift(toChannelType(compID), uiLog2TrSize);
+	const Int iQBits = QUANT_SHIFT + cQP.per + iTransformShift;
+	
+	const Int iAdd   = (rpcCU->getSlice()->getSliceType()==I_SLICE ? 171 : 85) << (iQBits-9);  //pcCU=rpcBestCU
+    const Int qBits8 = iQBits - 8;
+	
+	const Int  defaultQuantisationCoefficient = g_quantScales[cQP.rem];
+	
+	for( Int uiBlockPos = 0; uiBlockPos < uiWidth*uiHeight; uiBlockPos++ )
+    {
+      const TCoeff iLevel   = piCoef[uiBlockPos];
+      const TCoeff iSign    = (iLevel < 0 ? -1: 1);
+
+      const Int64  tmpLevel = (Int64)abs(iLevel) * defaultQuantisationCoefficient;
+	  const TCoeff quantisedMagnitude = TCoeff((tmpLevel + iAdd ) >> iQBits);
+	  deltaU[uiBlockPos] = (TCoeff)((tmpLevel - (quantisedMagnitude<<iQBits) )>> qBits8);
+	  
+	  uiAbsSum += quantisedMagnitude;
+      const TCoeff quantisedCoefficient = quantisedMagnitude * iSign;
+	  
+	  piQCoef[uiBlockPos] = Clip3<TCoeff>( entropyCodingMinimum, entropyCodingMaximum, quantisedCoefficient );
+	  
+	 }
+	 
+	  if(uiAbsSum >= 2) //this prevents TUs with only one coefficient of value 1 from being tested
+      {
+        signBitHidingHDQ( compID, piQCoef, piCoef, deltaU, codingParameters ) ;
+      }
+}
+#endif
 
 Void TComTrQuant::xQuant(       TComTU       &rTu,
                                 TCoeff      * pSrc,
@@ -1199,6 +1254,76 @@ Void TComTrQuant::xQuant(       TComTU       &rTu,
   } //if RDOQ
   //return;
 }
+
+
+#if QP_MODIFY
+Void TComTrQuant::xDeQuant_MODIFY( const TCoeff      * pSrc,
+				                  TCoeff      * pDes,
+						    const UInt		TUDepth,        //TUDepth=FirstCUDepth+FirstTUDepth
+						    const ComponentID   compID,
+						    const QpParam      &cQP )
+{
+  assert(compID<MAX_NUM_COMPONENT);
+
+  const UInt                 uiWidth            = g_ListDepthSize[compID][TUDepth];
+  const UInt                 uiHeight           = g_ListDepthSize[compID][TUDepth];
+  const TCoeff        *const piQCoef            = pSrc;
+        TCoeff        *const piCoef             = pDes;
+  const UInt 				 uiLog2TrSize=g_aucConvertToBit[uiHeight]+2;   //TUsize.height+2  compID的问题 luma是4*4的话，chroma是4*4
+  const UInt                 numSamplesInBlock  = uiWidth*uiHeight;
+  const TCoeff               transformMinimum   = -(1 << g_maxTrDynamicRange[toChannelType(compID)]);
+  const TCoeff               transformMaximum   =  (1 << g_maxTrDynamicRange[toChannelType(compID)]) - 1;  
+  
+  assert ( uiWidth <= m_uiMaxTrSize );
+
+  // Represents scaling through forward transform
+  const Bool bClipTransformShiftTo0 = false;
+  const Int  originalTransformShift = getTransformShift(toChannelType(compID), uiLog2TrSize);
+  const Int  iTransformShift        = bClipTransformShiftTo0 ? std::max<Int>(0, originalTransformShift) : originalTransformShift;
+
+  const Int QP_per = cQP.per;
+  const Int QP_rem = cQP.rem;
+
+  const Int rightShift = (IQUANT_SHIFT - (iTransformShift + QP_per)) + 0;
+
+
+    const Int scale     =  g_invQuantScales[QP_rem];
+    const Int scaleBits =     (IQUANT_SHIFT + 1)   ;
+
+    //from the dequantisation equation:
+    //iCoeffQ                         = Intermediate_Int((Int64(clipQCoef) * scale + iAdd) >> rightShift);
+    //(sizeof(Intermediate_Int) * 8)  =                    inputBitDepth   + scaleBits      - rightShift
+    const UInt             targetInputBitDepth = std::min<UInt>((g_maxTrDynamicRange[toChannelType(compID)] + 1), (((sizeof(Intermediate_Int) * 8) + rightShift) - scaleBits));
+    const Intermediate_Int inputMinimum        = -(1 << (targetInputBitDepth - 1));
+    const Intermediate_Int inputMaximum        =  (1 << (targetInputBitDepth - 1)) - 1;
+
+    if (rightShift > 0)
+    {
+      const Intermediate_Int iAdd = 1 << (rightShift - 1);
+
+      for( Int n = 0; n < numSamplesInBlock; n++ )
+      {
+        const TCoeff           clipQCoef = TCoeff(Clip3<Intermediate_Int>(inputMinimum, inputMaximum, piQCoef[n]));
+        const Intermediate_Int iCoeffQ   = (Intermediate_Int(clipQCoef) * scale + iAdd) >> rightShift;
+
+        piCoef[n] = TCoeff(Clip3<Intermediate_Int>(transformMinimum,transformMaximum,iCoeffQ));
+      }
+    }
+    else
+    {
+      const Int leftShift = -rightShift;
+
+      for( Int n = 0; n < numSamplesInBlock; n++ )
+      {
+        const TCoeff           clipQCoef = TCoeff(Clip3<Intermediate_Int>(inputMinimum, inputMaximum, piQCoef[n]));
+        const Intermediate_Int iCoeffQ   = (Intermediate_Int(clipQCoef) * scale) << leftShift;
+
+        piCoef[n] = TCoeff(Clip3<Intermediate_Int>(transformMinimum,transformMaximum,iCoeffQ));
+      }
+    }
+}
+#endif
+
 
 Void TComTrQuant::xDeQuant(       TComTU        &rTu,
                             const TCoeff       * pSrc,
@@ -1332,6 +1457,7 @@ Void TComTrQuant::init(   UInt  uiMaxTrSize,
 #endif
   m_useTransformSkipFast = useTransformSkipFast;
 }
+
 
 
 Void TComTrQuant::transformNxN(       TComTU        & rTu,

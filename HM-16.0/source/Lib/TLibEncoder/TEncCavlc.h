@@ -127,6 +127,16 @@ public:
   Void codeChromaQpAdjustment( TComDataCU* pcCU, UInt uiAbsPartIdx );
 
   Void codeCoeffNxN      ( TComTU &rTu, TCoeff* pcCoef, const ComponentID compID );
+#if QP_MODIFY
+  Void codeCoeffNxN_MODIFY (TComDataCU* &pcCU, 
+								  TCoeff* pcCoef, 
+								  UInt    uiWidth,
+								  UInt    uiHeight,
+								  UInt    uiAbsPartIdx,  
+								  UInt    CUListIndex,
+								  UInt    TUDepth,
+							const ComponentID compID );
+#endif
   Void codeTransformSkipFlags ( TComTU &rTu, ComponentID component );
 
   Void estBit            ( estBitsSbacStruct* pcEstBitsSbac, Int width, Int height, ChannelType chType );

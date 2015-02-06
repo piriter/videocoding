@@ -75,7 +75,10 @@ typedef struct
 // ====================================================================================================================
 // Class definition
 // ====================================================================================================================
-
+#if QP_MODIFY
+extern UInt g_ListIndexInc[TOTALDEPTH];
+extern UInt g_ListDepthSize[PIMAXCOMPONENT][TOTALDEPTH];
+#endif
 /// QP struct
 struct QpParam
 {
@@ -125,6 +128,22 @@ public:
                      const QpParam        & cQP
                     );
 
+#if QP_MODIFY
+  Void transformNxN_TR(       TComTU         & rTu,
+                     const ComponentID      compID,
+                           Pel           *  pcResidual,
+                     const UInt             uiStride,
+                           TCoeff        *  rpcCoeff,
+						   TCoeff        *  rpcTRCoeff,
+#if ADAPTIVE_QP_SELECTION
+                           TCoeff        *& rpcArlCoeff,
+#endif
+                           TCoeff         & uiAbsSum,
+                     const QpParam        & cQP
+                    );
+
+  TCoeff*& getTRCoeff() {return m_plTempCoeff;} 
+#endif
 
   Void invTransformNxN(      TComTU       & rTu,
                        const ComponentID    compID,
@@ -141,6 +160,30 @@ public:
 
   Void applyForwardRDPCM( TComTU& rTu, const ComponentID compID, Pel* pcResidual, const UInt uiStride, const QpParam& cQP, TCoeff* pcCoeff, TCoeff &uiAbsSum, const RDPCMMode mode );
 
+#if QP_MODIFY
+  Void xQuant_MODIFY(       TComDataCU*& rpcCU,
+                     TCoeff      * pSrc,
+                     TCoeff      * pDes,
+                     TCoeff       &uiAbsSum,
+			   const UInt		CUListIndex,	
+			   const UInt		TUDepth,
+               const ComponentID   compID,
+               const QpParam      &cQP );
+
+#endif
+
+#if QP_MODIFY
+  Void xDeQuant_MODIFY( const TCoeff      * pSrc,
+				       TCoeff      * pDes,
+			     const UInt		TUDepth,        //TUDepth=FirstCUDepth+FirstTUDepth
+				 const ComponentID   compID,
+				 const QpParam      &cQP );
+#endif
+
+#if QP_MODIFY
+  // inverse transform
+  Void xIT    ( const ComponentID compID, Bool useDST, TCoeff* plCoef, Pel* pResidual, UInt uiStride, Int iWidth, Int iHeight );
+# endif
   // Misc functions
 
 #if RDOQ_CHROMA_LAMBDA
@@ -247,6 +290,8 @@ private:
                const ComponentID   compID,
                const QpParam      &cQP );
 
+
+
   // RDOQ functions
 
   Void           xRateDistOptQuant (       TComTU       &rTu,
@@ -302,8 +347,11 @@ __inline UInt              xGetCodedLevel  ( Double&          rd64CodedCost,
                  const ComponentID   compID,
                  const QpParam      &cQP );
 
+  #if QP_MODIFY
+  #else
   // inverse transform
   Void xIT    ( const ComponentID compID, Bool useDST, TCoeff* plCoef, Pel* pResidual, UInt uiStride, Int iWidth, Int iHeight );
+  #endif
 
   // inverse skipping transform
   Void xITransformSkip ( TCoeff* plCoef, Pel* pResidual, UInt uiStride, TComTU &rTu, const ComponentID component );

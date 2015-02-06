@@ -1,11 +1,9 @@
-﻿生成启动时间为 2015/1/21 13:52:11。
-     1>项目“E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\vc10\TLibEncoder_vc10.vcxproj”在节点 4 上(rebuild 个目标)。
-     1>_PrepareForClean:
-         正在删除文件“E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TLibEncoder.lastbuildstate”。
-       InitializeBuildStatus:
-         正在创建“E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TLibEncoder.unsuccessfulbuild”，因为已指定“AlwaysCreate”。
+﻿生成启动时间为 2015/1/27 10:06:24。
+     1>项目“E:\Github\videocoding\HM-16.0\build\vc10\TLibEncoder_vc10.vcxproj”在节点 4 上(build 个目标)。
+     1>InitializeBuildStatus:
+         正在创建“E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TLibEncoder.unsuccessfulbuild”，因为已指定“AlwaysCreate”。
        ClCompile:
-         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\x86_amd64\CL.exe /c /I"E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\..\source\Lib\\" /I"E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\..\compat\msvc" /Zi /nologo /W3 /WX- /O2 /Ob2 /Ot /GL /D WIN32 /D _LIB /D _CRT_SECURE_NO_WARNINGS /D _MBCS /GF /Gm- /EHsc /MT /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Fo"E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\\" /Fd"E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\vc100.pdb" /Gd /TP /errorReport:prompt ..\..\source\Lib\TLibEncoder\NALwrite.cpp ..\..\source\Lib\TLibEncoder\SEIwrite.cpp ..\..\source\Lib\TLibEncoder\SyntaxElementWriter.cpp ..\..\source\Lib\TLibEncoder\TEncAnalyze.cpp ..\..\source\Lib\TLibEncoder\TEncBinCoderCABAC.cpp ..\..\source\Lib\TLibEncoder\TEncBinCoderCABACCounter.cpp ..\..\source\Lib\TLibEncoder\TEncCavlc.cpp ..\..\source\Lib\TLibEncoder\TEncCu.cpp ..\..\source\Lib\TLibEncoder\TEncEntropy.cpp ..\..\source\Lib\TLibEncoder\TEncGOP.cpp ..\..\source\Lib\TLibEncoder\TEncPic.cpp ..\..\source\Lib\TLibEncoder\TEncPreanalyzer.cpp ..\..\source\Lib\TLibEncoder\TEncRateCtrl.cpp ..\..\source\Lib\TLibEncoder\TEncSampleAdaptiveOffset.cpp ..\..\source\Lib\TLibEncoder\TEncSbac.cpp ..\..\source\Lib\TLibEncoder\TEncSearch.cpp ..\..\source\Lib\TLibEncoder\TEncSlice.cpp ..\..\source\Lib\TLibEncoder\TEncTop.cpp ..\..\source\Lib\TLibEncoder\WeightPredAnalysis.cpp
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\x86_amd64\CL.exe /c /I"E:\Github\videocoding\HM-16.0\build\\..\source\Lib\\" /I"E:\Github\videocoding\HM-16.0\build\\..\compat\msvc" /Zi /nologo /W3 /WX- /O2 /Ob2 /Ot /GL /D WIN32 /D _LIB /D _CRT_SECURE_NO_WARNINGS /D _MBCS /GF /Gm- /EHsc /MT /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Fo"E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\\" /Fd"E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\vc100.pdb" /Gd /TP /errorReport:prompt ..\..\source\Lib\TLibEncoder\NALwrite.cpp ..\..\source\Lib\TLibEncoder\SEIwrite.cpp ..\..\source\Lib\TLibEncoder\SyntaxElementWriter.cpp ..\..\source\Lib\TLibEncoder\TEncAnalyze.cpp ..\..\source\Lib\TLibEncoder\TEncBinCoderCABAC.cpp ..\..\source\Lib\TLibEncoder\TEncBinCoderCABACCounter.cpp ..\..\source\Lib\TLibEncoder\TEncCavlc.cpp ..\..\source\Lib\TLibEncoder\TEncCu.cpp ..\..\source\Lib\TLibEncoder\TEncEntropy.cpp ..\..\source\Lib\TLibEncoder\TEncGOP.cpp ..\..\source\Lib\TLibEncoder\TEncPic.cpp ..\..\source\Lib\TLibEncoder\TEncPreanalyzer.cpp ..\..\source\Lib\TLibEncoder\TEncRateCtrl.cpp ..\..\source\Lib\TLibEncoder\TEncSampleAdaptiveOffset.cpp ..\..\source\Lib\TLibEncoder\TEncSbac.cpp ..\..\source\Lib\TLibEncoder\TEncSearch.cpp ..\..\source\Lib\TLibEncoder\TEncSlice.cpp ..\..\source\Lib\TLibEncoder\TEncTop.cpp ..\..\source\Lib\TLibEncoder\WeightPredAnalysis.cpp
          NALwrite.cpp
          SEIwrite.cpp
          SyntaxElementWriter.cpp
@@ -26,31 +24,31 @@
          TEncTop.cpp
          WeightPredAnalysis.cpp
        Lib:
-         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\x86_amd64\Lib.exe /OUT:"E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TLibEncoder.lib" /NOLOGO /LTCG "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\NALwrite.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\SEIwrite.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\SyntaxElementWriter.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncAnalyze.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncBinCoderCABAC.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncBinCoderCABACCounter.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncCavlc.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncCu.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncEntropy.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncGOP.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncPic.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncPreanalyzer.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncRateCtrl.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncSampleAdaptiveOffset.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncSbac.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncSearch.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncSlice.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TEncTop.obj"
-         "E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\WeightPredAnalysis.obj"
-         TLibEncoder_vc10.vcxproj -> E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TLibEncoder.lib
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\x86_amd64\Lib.exe /OUT:"E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TLibEncoder.lib" /NOLOGO /LTCG "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\NALwrite.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\SEIwrite.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\SyntaxElementWriter.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncAnalyze.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncBinCoderCABAC.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncBinCoderCABACCounter.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncCavlc.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncCu.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncEntropy.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncGOP.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncPic.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncPreanalyzer.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncRateCtrl.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncSampleAdaptiveOffset.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncSbac.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncSearch.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncSlice.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TEncTop.obj"
+         "E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\WeightPredAnalysis.obj"
+         TLibEncoder_vc10.vcxproj -> E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TLibEncoder.lib
        FinalizeBuildStatus:
-         正在删除文件“E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TLibEncoder.unsuccessfulbuild”。
-         正在对“E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\\vc10\x64\Release\TLibEncoder\TLibEncoder.lastbuildstate”执行 Touch 任务。
-     1>已完成生成项目“E:\A_LAB_workplace\Global RDO\HM-16.0_QT_V2\build\vc10\TLibEncoder_vc10.vcxproj”(rebuild 个目标)的操作。
+         正在删除文件“E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TLibEncoder.unsuccessfulbuild”。
+         正在对“E:\Github\videocoding\HM-16.0\build\\vc10\x64\Release\TLibEncoder\TLibEncoder.lastbuildstate”执行 Touch 任务。
+     1>已完成生成项目“E:\Github\videocoding\HM-16.0\build\vc10\TLibEncoder_vc10.vcxproj”(build 个目标)的操作。
 
 生成成功。
 
-已用时间 00:00:18.02
+已用时间 00:00:21.57

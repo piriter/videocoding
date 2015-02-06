@@ -73,7 +73,9 @@ Void TEncCu::create(UChar uhTotalDepth, UInt uiMaxWidth, UInt uiMaxHeight, Chrom
   m_ppcResiYuvTemp = new TComYuv*[m_uhTotalDepth-1];
   m_ppcRecoYuvTemp = new TComYuv*[m_uhTotalDepth-1];
   m_ppcOrigYuv     = new TComYuv*[m_uhTotalDepth-1];
-
+#if QP_MODIFY
+//  m_pBestPredYuvBest= new TComYuv;m_pBestPredYuvBest->create(uiMaxWidth, uiMaxHeight, chromaFormat);
+#endif
   UInt uiNumPartitions;
   for( i=0 ; i<m_uhTotalDepth-1 ; i++)
   {
@@ -167,6 +169,16 @@ Void TEncCu::destroy()
     delete [] m_ppcPredYuvBest;
     m_ppcPredYuvBest = NULL;
   }
+
+#if QP_MODIFY
+//  if(m_pBestPredYuvBest)
+//  {
+//	m_pBestPredYuvBest->destroy();
+//    delete [] m_pBestPredYuvBest;
+//    m_pBestPredYuvBest = NULL;
+//  }
+#endif
+
   if(m_ppcResiYuvBest)
   {
     delete [] m_ppcResiYuvBest;
@@ -237,6 +249,11 @@ Void TEncCu::compressCU( TComDataCU*& rpcCU )
 
   xCompressCU( m_ppcBestCU[0], m_ppcTempCU[0], 0 DEBUG_STRING_PASS_INTO(sDebug) );
 
+#if QP_MODIFY
+ //m_ppcPredYuvBest[0]=The best pred Yuv per LCU
+  xCuQPSel(m_ppcBestCU[0]);
+
+#endif
   DEBUG_STRING_OUTPUT(std::cout, sDebug)
 
 #if ADAPTIVE_QP_SELECTION
@@ -801,7 +818,7 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
 #endif
 
           rpcTempCU->copyPartFrom( pcSubBestPartCU, uiPartUnitIdx, uhNextDepth );         // Keep best part data to current temporary data.
-          xCopyYuv2Tmp( pcSubBestPartCU->getTotalNumPart()*uiPartUnitIdx, uhNextDepth );
+          xCopyYuv2Tmp( pcSubBestPartCU->getTotalNumPart()*uiPartUnitIdx, uhNextDepth );  //copy the subbestpart to the current depth
         }
         else if (bInSlice)
         {
@@ -900,12 +917,410 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt u
   assert( rpcBestCU->getTotalCost     (   ) != MAX_DOUBLE                 );
 }
 
+#define MINQP  25
+#define MAXQP  39
+#if QP_FLUCT
+Void TEncCu::xCompressCUQP( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU,TComDataCU*& rpcBaseQPCU, UInt uiDepth DEBUG_STRING_FN_DECLARE(sDebug), PartSize eParentPartSize )
+{
+	//detect max depth
+  Int max_depth=0;
+  for(UInt i=0;i<(rpcBaseQPCU->getTotalNumPart()-1);i++)
+  {
+	if(rpcBaseQPCU->getDepth(i)>max_depth)
+	{
+		max_depth=rpcBaseQPCU->getDepth(i);
+	}
+  }
+	
+  TComPic* pcPic = rpcBestCU->getPic();
+//  DEBUG_STRING_NEW(sDebug)
+   // get Original YUV data from picture
+  m_ppcOrigYuv[uiDepth]->copyFromPicYuv( pcPic->getPicYuvOrg(), rpcBestCU->getAddr(), rpcBestCU->getZorderIdxInCU() );
+    // variable for Early CU determination
+  Bool    bSubBranch = true;
+  // variable for Cbf fast mode PU decision
+  Bool    doNotBlockPu = true;
+  Bool    earlyDetectionSkipMode = false;
+
+  Bool bBoundary = false;
+  UInt uiLPelX   = rpcBestCU->getCUPelX();
+  UInt uiRPelX   = uiLPelX + rpcBestCU->getWidth(0)  - 1;
+  UInt uiTPelY   = rpcBestCU->getCUPelY();
+  UInt uiBPelY   = uiTPelY + rpcBestCU->getHeight(0) - 1;
+
+  Int iBaseQP = xComputeQP( rpcBestCU, uiDepth );
+  Int iMinQP=MINQP;
+  Int iMaxQP=MAXQP;
+  Bool isAddLowestQP = false;
+
+  if ( (rpcTempCU->getSlice()->getPPS()->getTransquantBypassEnableFlag()) )
+  {
+    isAddLowestQP = true; // mark that the first iteration is to cost TQB mode.
+    iMinQP = iMinQP - 1;  // increase loop variable range by 1, to allow testing of TQB mode along with other QPs
+    if ( m_pcEncCfg->getCUTransquantBypassFlagForceValue() )
+    {
+      iMaxQP = iMinQP;
+    }
+  }
+
+  const UInt numberValidComponents = rpcBestCU->getPic()->getNumberValidComponents();
+  // If slice start or slice end is within this cu...
+  TComSlice * pcSlice = rpcTempCU->getPic()->getSlice(rpcTempCU->getPic()->getCurrSliceIdx());
+  Bool bSliceStart = pcSlice->getSliceSegmentCurStartCUAddr()>rpcTempCU->getSCUAddr()&&pcSlice->getSliceSegmentCurStartCUAddr()<rpcTempCU->getSCUAddr()+rpcTempCU->getTotalNumPart();
+  Bool bSliceEnd = (pcSlice->getSliceSegmentCurEndCUAddr()>rpcTempCU->getSCUAddr()&&pcSlice->getSliceSegmentCurEndCUAddr()<rpcTempCU->getSCUAddr()+rpcTempCU->getTotalNumPart());
+  Bool bInsidePicture = ( uiRPelX < rpcBestCU->getSlice()->getSPS()->getPicWidthInLumaSamples() ) && ( uiBPelY < rpcBestCU->getSlice()->getSPS()->getPicHeightInLumaSamples() );
+   // We need to split, so don't try these modes.
+  if(!bSliceEnd && !bSliceStart && bInsidePicture )
+  {
+		
+  }
+  else if(!(bSliceEnd && bInsidePicture))
+  {
+    bBoundary = true;
+  }
+
+  switch(max_depth)
+  {
+  case 0:
+		for(Int iQP=iMinQP;iQP<=iMaxQP;iQP++)
+		{
+			//do normal intra or inter mode
+			const Bool bIsLosslessMode = isAddLowestQP && (iQP == iMinQP);
+			rpcTempCU->initEstData( uiDepth, iQP, bIsLosslessMode );
+			if(rpcBaseQPCU->getPredictionMode(0)==MODE_INTER)
+			{			
+				PartSize PUSize=rpcBaseQPCU->getPartitionSize(0);
+		        xCheckRDCostInter( rpcBestCU, rpcTempCU, PUSize DEBUG_STRING_PASS_INTO(sDebug) );
+                rpcTempCU->initEstData( uiDepth, iQP, bIsLosslessMode );//by Competition for inter_2Nx2N  
+			}
+			if(rpcBaseQPCU->getPredictionMode(0)==MODE_INTRA)
+			{
+				if(rpcBaseQPCU->getSkipFlag(0)==1)
+				{
+				  // SKIP
+				  xCheckRDCostMerge2Nx2N( rpcBestCU, rpcTempCU DEBUG_STRING_PASS_INTO(sDebug), &earlyDetectionSkipMode );//by Merge for inter_2Nx2N
+				  rpcTempCU->initEstData( uiDepth, iQP, bIsLosslessMode );
+				}
+				else
+				{
+				  Double intraCost = 0.0;
+				 xCheckRDCostIntra( rpcBestCU, rpcTempCU, intraCost, SIZE_2Nx2N DEBUG_STRING_PASS_INTO(sDebug) );
+                 rpcTempCU->initEstData( uiDepth, iQP, bIsLosslessMode );
+				}
+				//test PCM??????
+				//Current PCM implementation encodes sample values in a lossless way. The distortion of PCM mode CUs are zero. PCM mode is selected if the best mode yields bits greater than that of PCM mode.
+
+			}
+		   //Add split flag cost
+			m_pcEntropyCoder->resetBits();
+			m_pcEntropyCoder->encodeSplitFlag( rpcBestCU, 0, uiDepth, true );
+		    rpcBestCU->getTotalBits() += m_pcEntropyCoder->getNumberOfWrittenBits(); // split bits
+		    rpcBestCU->getTotalBins() += ((TEncBinCABAC *)((TEncSbac*)m_pcEntropyCoder->m_pcEntropyCoderIf)->getEncBinIf())->getBinsCoded();
+		    rpcBestCU->getTotalCost()  = m_pcRdCost->calcRdCost( rpcBestCU->getTotalBits(), rpcBestCU->getTotalDistortion() );
+		  // Early CU determination
+		   if( m_pcEncCfg->getUseEarlyCU() && rpcBestCU->isSkipped(0) )
+		   {
+		      bSubBranch = false;
+		   }
+		  else
+		   {
+		     bSubBranch = true;
+		   }
+		    // copy orginal YUV samples to PCM buffer
+		  if( rpcBestCU->isLosslessCoded(0) && (rpcBestCU->getIPCMFlag(0) == false))
+		  {
+		    xFillPCMBuffer(rpcBestCU, m_ppcOrigYuv[uiDepth]);
+		  }
+		  //xCheckBestQP:在相同的预测残差下，QP的最优值
+
+
+		}
+  case 1:
+	   
+  case 2:
+  case 3: 
+	  ;
+  }
+}
+#endif
+
 /** finish encoding a cu and handle end-of-slice conditions
  * \param pcCU
  * \param uiAbsPartIdx
  * \param uiDepth
  * \returns Void
  */
+#if QP_MODIFY
+//#define MAXDEPTH  4
+//#define TOTALDEPTH 5
+//#define PIMAXCOMPONENT 3
+//Int g_ListIndexInc[TOTALDEPTH]={256,64,16,4,1};     //16*16,8*8,4*4,2*2,1*1
+//Int g_ListDepthSize[PIMAXCOMPONENT][TOTALDEPTH]={{64,32,16,8,4},{32,16,8,4,4},{32,16,8,4,4}};
+
+Void  TEncCu::xperQPSelCu (      TComDataCU*& rpcBestCU,
+						     const UInt         numValidComp,
+								   Double*      uiCompTotalCost
+							)
+{
+	 	Int    CUListIndex=0;    
+		do
+		{
+			Int FirstCUDepth=rpcBestCU->getDepth(CUListIndex);      //CU processing
+			Int ChromaCountflag=0;
+			if(rpcBestCU->getSkipFlag(CUListIndex)==true)
+			{
+				CUListIndex+=g_ListIndexInc[FirstCUDepth];
+				continue;
+			}
+			else
+			{
+				Int TUListIndex=CUListIndex;                      //TU processing
+				Int ChromaTUListIndex=CUListIndex;				  //Deal with the occation that the minimum transform kernel size is 4*4, but the minimum size of chroma is 2*2
+				do
+				{
+					Int FirstTUDepth=rpcBestCU->getTransformIdx(TUListIndex);
+					Int TUToatalDepth=FirstCUDepth+FirstTUDepth;
+					
+					//根据DepthSize选择相应的变换核进行量化，反量化和反变换
+					//set QP 32
+					Double     uiRDCost[3] = {0.0,};
+					for(UInt i=0; i<numValidComp; i++)
+					{
+						const ComponentID compID=ComponentID(i);
+					    if((compID==COMPONENT_Y)||(TUListIndex==ChromaTUListIndex))
+						{
+							const QpParam cQP(*rpcBestCU, compID);
+							UInt  uiWidth=g_ListDepthSize[compID][TUToatalDepth];
+							UInt  uiHeight=g_ListDepthSize[compID][TUToatalDepth];
+							//根据变换系数进行量化
+							//void tcomtrquant::xQuant_MODIFY(       tcomdatacu*& rpccu,
+							//      tcoeff      * psrc,
+							//      tcoeff      * pdes,
+							//      tcoeff       &uiabssum,
+							//const uint		culistindex,	
+							// const uint		tudepth,        //tudepth=firstcudepth+firsttudepth
+							// const componentid   compid,
+							// const qpparam      &cqp )
+							TCoeff TRcoeff[MAX_TU_SIZE * MAX_TU_SIZE];
+							TCoeff QTcoeff[MAX_TU_SIZE * MAX_TU_SIZE];
+							TCoeff AbsSum=0;
+							TCoeff* src=rpcBestCU->getTRCoeff(compID)+(TUListIndex*16>>(2*getComponentScaleX(compID,CHROMA_420)));    //chroma情况下？
+							::memcpy(TRcoeff,src,sizeof(TCoeff)*uiWidth*uiHeight);
+							m_pcTrQuant->xQuant_MODIFY(rpcBestCU,TRcoeff,QTcoeff,AbsSum,CUListIndex,TUToatalDepth,compID,cQP);
+
+							//反量化
+							//Void TComTrQuant::xDeQuant_MODIFY( const TCoeff      * pSrc,
+							//                  TCoeff      * pDes,
+							//		    const UInt		TUDepth,        //TUDepth=FirstCUDepth+FirstTUDepth
+							//		    const ComponentID   compID,
+							//		    const QpParam      &cQP )
+							TCoeff InvTRcoeff[MAX_TU_SIZE * MAX_TU_SIZE];
+							m_pcTrQuant->xDeQuant_MODIFY(QTcoeff,InvTRcoeff,TUToatalDepth,compID,cQP);
+
+							//反变换---------------------可以不做
+							//	Void TComTrQuant::xIT( const ComponentID compID, Bool useDST, TCoeff* plCoef, Pel* pResidual, UInt uiStride, Int iWidth, Int iHeight )
+							//  useDST=isLuma(compID) && pcCU->isIntra(absPartIdx);
+							//  if isLuma(compID) uiStride=m_iWidth else uiStride>>1
+							Bool useDST=((compID==COMPONENT_Y)&&rpcBestCU->isIntra(CUListIndex));
+							UInt uiStride=uiWidth;
+							Pel Residual[MAX_TU_SIZE * MAX_TU_SIZE];
+
+							m_pcTrQuant->xIT(compID,useDST,TRcoeff,Residual,uiStride,uiWidth,uiHeight);
+
+							//Distortion  在变换域上进行计算
+							//m_pcRdCost->getDistPart( g_bitDepth[toChannelType(compID)], rpcYuvRec->getAddr(compID ), rpcYuvRec->getStride(compID ), 
+							//						pcYuvOrg->getAddr(compID ), pcYuvOrg->getStride(compID), uiWidth >> pcYuvOrg->getComponentScaleX(compID), 
+							//						uiHeight >> pcYuvOrg->getComponentScaleY(compID), compID);
+							Distortion uiCompDist=0;
+							uiCompDist=m_pcRdCost->getDistPart(g_bitDepth[toChannelType(compID)],(Pel*)InvTRcoeff,uiStride,(Pel*)TRcoeff,uiStride,uiWidth,uiHeight,compID);
+							//bitRate
+							//Void TEncSearch::xEstimateBitRate(      UInt        uiDepth,
+							//                              TCoeff      *currentCoefficients,
+							//                           	  TComTU       &rTu,
+							//                       const  ComponentID  compID,
+							//                           	  UInt         &currCompBits
+							//             )
+							UInt uiCompBits=0;
+							m_pcPredSearch->xEstimateBitRate(rpcBestCU,QTcoeff,uiWidth,uiHeight,TUListIndex,CUListIndex,TUToatalDepth,compID,uiCompBits);
+
+							//rdCost
+							uiRDCost[compID]=m_pcRdCost->calcRdCost(uiCompBits, uiCompDist);
+							uiCompTotalCost[compID]+=uiRDCost[compID];
+							//重建
+							// rpcYuvRec->addClip ( pcYuvPred, rpcYuvResiBest, 0, uiWidth );
+							const Pel* pSrc0=m_ppcPredYuvBest[0]->getAddr(compID)+(TUListIndex*16>>(2*getComponentScaleX(compID,CHROMA_420))); //chroma
+							const Pel* pSrc1=Residual;
+							Pel* pDst =m_ppcRecoYuvBest[0]->getAddr(compID)+(TUListIndex*16>>(2*getComponentScaleX(compID,CHROMA_420))); //chroma
+							const Int clipbd = g_bitDepth[toChannelType(compID)];
+							for ( Int y = uiHeight-1; y >= 0; y-- )
+							{
+								for ( Int x = uiWidth-1; x >= 0; x-- )
+								{
+									pDst[x] = Pel(ClipBD<Int>( Int(pSrc0[x]) + Int(pSrc1[x]), clipbd));
+								}
+								pSrc0 += uiStride;
+								pSrc1 += uiStride;
+								pDst  += uiStride;
+							}
+						}
+					}							
+				TUListIndex+=g_ListIndexInc[TUToatalDepth];         //next TU
+				if(TUToatalDepth==4)
+				{
+					if(!ChromaCountflag)
+					{
+						ChromaTUListIndex+=g_ListIndexInc[TUToatalDepth]*4;  //quadtree
+						++ChromaCountflag;
+					}
+					else if(ChromaCountflag==3)
+					{
+						ChromaCountflag=0;
+					}
+					else
+					{
+						++ChromaCountflag;
+					}
+				}
+				else
+				{
+					ChromaTUListIndex+=g_ListIndexInc[TUToatalDepth];
+				}
+			}while(TUListIndex<(CUListIndex+g_ListIndexInc[FirstCUDepth]));   //TU processing end
+			CUListIndex+=g_ListIndexInc[FirstCUDepth];   //next CU
+		 }
+	  }while(CUListIndex<rpcBestCU->getTotalNumPart());  //CU processing end
+ }
+
+Void TEncCu::xUpdateCUContent(TComDataCU*& rpcBestCU,const UInt numValidComp)
+{
+		Int    CUListIndex=0;    
+		do
+		{
+			Int FirstCUDepth=rpcBestCU->getDepth(CUListIndex);      //CU processing
+			Int ChromaCountflag=0;
+			if(rpcBestCU->getSkipFlag(CUListIndex)==true)
+			{
+				CUListIndex+=g_ListIndexInc[FirstCUDepth];
+				continue;
+			}
+			else
+			{
+				Int TUListIndex=CUListIndex;                      //TU processing
+				Int ChromaTUListIndex=CUListIndex;				  //Deal with the occation that the minimum transform kernel size is 4*4, but the minimum size of chroma is 2*2
+				do
+				{
+					Int FirstTUDepth=rpcBestCU->getTransformIdx(TUListIndex);
+					Int TUToatalDepth=FirstCUDepth+FirstTUDepth;
+					
+					//根据DepthSize选择相应的变换核进行量化，反量化和反变换
+					//set QP 32
+					for(UInt i=0; i<numValidComp; i++)
+					{
+						const ComponentID compID=ComponentID(i);
+						if((compID==COMPONENT_Y)||(TUListIndex==ChromaTUListIndex))
+						{
+							const QpParam cQP(*rpcBestCU, compID);
+							UInt  uiWidth=g_ListDepthSize[compID][TUToatalDepth];  //luma and chroma are different
+							UInt  uiHeight=g_ListDepthSize[compID][TUToatalDepth];
+							//根据变换系数进行量化
+							TCoeff TRcoeff[MAX_TU_SIZE * MAX_TU_SIZE];  //transform
+							TCoeff QTcoeff[MAX_TU_SIZE * MAX_TU_SIZE];  //quantization
+							TCoeff AbsSum=0;
+							TCoeff* src=rpcBestCU->getTRCoeff(compID)+(TUListIndex*16>>(2*getComponentScaleX(compID,CHROMA_420)));    //chroma情况下？
+							::memcpy(TRcoeff,src,sizeof(TCoeff)*uiWidth*uiHeight);
+							m_pcTrQuant->xQuant_MODIFY(rpcBestCU,TRcoeff,QTcoeff,AbsSum,CUListIndex,TUToatalDepth,compID,cQP);
+							TCoeff* dest=rpcBestCU->getCoeff(compID)+(TUListIndex*16>>(2*getComponentScaleX(compID,CHROMA_420)));  //update quantization Coeff     chroma情况下？
+							::memcpy(dest,QTcoeff,sizeof(TCoeff)*uiWidth*uiHeight);
+
+							//反量化
+							TCoeff InvTRcoeff[MAX_TU_SIZE * MAX_TU_SIZE];
+							m_pcTrQuant->xDeQuant_MODIFY(QTcoeff,InvTRcoeff,TUToatalDepth,compID,cQP);
+
+							//反变换
+							Bool useDST=((compID==COMPONENT_Y)&&rpcBestCU->isIntra(CUListIndex));
+							UInt uiStride=uiWidth;
+							Pel Residual[MAX_TU_SIZE * MAX_TU_SIZE];
+
+							m_pcTrQuant->xIT(compID,useDST,TRcoeff,Residual,uiStride,uiWidth,uiHeight);
+							//重建
+							// rpcYuvRec->addClip ( pcYuvPred, rpcYuvResiBest, 0, uiWidth );
+							const Pel* pSrc0=m_ppcPredYuvBest[0]->getAddr(compID)+(TUListIndex*16>>(2*getComponentScaleX(compID,CHROMA_420))); //chroma
+							const Pel* pSrc1=Residual;
+							Pel* pDst =m_ppcRecoYuvBest[0]->getAddr(compID)+(TUListIndex*16>>(2*getComponentScaleX(compID,CHROMA_420))); //chroma
+							const Int clipbd = g_bitDepth[toChannelType(compID)];
+							for ( Int y = uiHeight-1; y >= 0; y-- )
+							{
+								for ( Int x = uiWidth-1; x >= 0; x-- )
+								{
+									pDst[x] = Pel(ClipBD<Int>( Int(pSrc0[x]) + Int(pSrc1[x]), clipbd));
+								}
+								pSrc0 += uiStride;
+								pSrc1 += uiStride;
+								pDst  += uiStride;
+							}
+						}
+					}
+				TUListIndex+=g_ListIndexInc[TUToatalDepth];         //next TU
+				if(TUToatalDepth==4)
+				{
+					if(!ChromaCountflag)
+					{
+						ChromaTUListIndex+=g_ListIndexInc[TUToatalDepth]*4;  //quadtree
+						++ChromaCountflag;
+					}
+					else if(ChromaCountflag==3)
+					{
+						ChromaCountflag=0;
+					}
+					else
+					{
+						++ChromaCountflag;
+					}
+				}
+				else
+				{
+					ChromaTUListIndex+=g_ListIndexInc[TUToatalDepth];
+				}
+
+			}while(TUListIndex<(CUListIndex+g_ListIndexInc[FirstCUDepth]));   //TU processing end
+			CUListIndex+=g_ListIndexInc[FirstCUDepth];   //next CU
+		 }
+	  }while(CUListIndex<rpcBestCU->getTotalNumPart());  //CU processing end
+}
+
+Void TEncCu::xCuQPSel(TComDataCU*& rpcBestCU)
+{
+//	Int g_ListIndexInc[TOTALDEPTH]={256,64,16,4,1};
+	Double uiBestCost=MAX_DOUBLE;
+	Double uiTotalCost=0.0;
+	Double uiCompTotalCost[3]={0.0,};
+	Int    uiBestQP=32;
+	const UInt numValidComp = rpcBestCU->getPic()->getNumberValidComponents();
+    for(Int QPBase=25;QPBase<38;QPBase++)
+	{
+		for(Int k=0;k<rpcBestCU->getTotalNumPart();k++)
+		{
+			rpcBestCU->setQP(k,QPBase);
+		}                                //CU QP setting
+		xperQPSelCu(rpcBestCU,numValidComp,uiCompTotalCost);
+	    for(UInt k=0; k<numValidComp; k++) 
+    	{
+    		uiTotalCost+=uiCompTotalCost[k];
+     	}
+    	 if(uiTotalCost<uiBestCost)
+    	 {
+	       uiBestCost=uiTotalCost;
+           uiBestQP=QPBase;
+	     }
+   }
+   for(Int k=0;k<rpcBestCU->getTotalNumPart();k++)
+   {
+		rpcBestCU->setQP(k,uiBestQP);
+   }                                //CU Bset QP setting
+   xUpdateCUContent(rpcBestCU,numValidComp);
+}
+#endif
+
 Void TEncCu::finishCU( TComDataCU* pcCU, UInt uiAbsPartIdx, UInt uiDepth )
 {
   TComPic* pcPic = pcCU->getPic();
@@ -1544,8 +1959,8 @@ Void TEncCu::xCheckIntraPCM( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU )
 }
 
 /** check whether current try is the best with identifying the depth of current try
- * \param rpcBestCU
- * \param rpcTempCU
+ * \param rpcBestCU       (Last check: the current depth try)
+ * \param rpcTempCU		  (Last check: the sum of sub depth try)
  * \returns Void
  */
 Void TEncCu::xCheckBestMode( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, UInt uiDepth DEBUG_STRING_FN_DECLARE(sParent) DEBUG_STRING_FN_DECLARE(sTest) DEBUG_STRING_PASS_INTO(Bool bAddSizeInfo) )

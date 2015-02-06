@@ -1355,10 +1355,26 @@ Void TEncCavlc::codeChromaQpAdjustment( TComDataCU* pcCU, UInt uiAbsPartIdx )
   assert(0);
 }
 
+
+
 Void TEncCavlc::codeCoeffNxN    ( TComTU &rTu, TCoeff* pcCoef, const ComponentID compID )
 {
   assert(0);
 }
+
+#if QP_MODIFY
+Void TEncCavlc::codeCoeffNxN_MODIFY (TComDataCU* &pcCU, 
+								  TCoeff* pcCoef, 
+								  UInt    uiWidth,
+								  UInt    uiHeight,
+								  UInt    uiAbsPartIdx,  
+								  UInt    CUListIndex,
+								  UInt    TUDepth,
+							const ComponentID compID )
+{
+	assert(0);
+}
+#endif
 
 Void TEncCavlc::estBit( estBitsSbacStruct* pcEstBitsCabac, Int width, Int height, ChannelType chType )
 {
