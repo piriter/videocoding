@@ -312,6 +312,10 @@ public:
 #endif
   Pel*&         getPCMSample          ( ComponentID component ) { return m_pcIPCMSample[component]; }
 
+ 
+#if QP_MODIFY
+  UChar         getCbf_MODIFY    ( UInt uiIdx, ComponentID eType )                  { return m_puhCbf[eType][uiIdx];  }
+#endif
   UChar         getCbf    ( UInt uiIdx, ComponentID eType )                  { return m_puhCbf[eType][uiIdx];  }
   UChar*        getCbf    ( ComponentID eType )                              { return m_puhCbf[eType];         }
   UChar         getCbf    ( UInt uiIdx, ComponentID eType, UInt uiTrDepth )  { return ( ( getCbf( uiIdx, eType ) >> uiTrDepth ) & 0x1 ); }

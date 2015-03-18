@@ -4957,10 +4957,14 @@ Void TEncSearch::xEstimateBitRate( TComDataCU* &pcCU,
 					           	  UInt         &currCompBits
                                       )
 {
+	 m_pcRDGoOnSbacCoder->load(m_pppcRDSbacCoder[ pcCU->getDepth( 0 ) ][ CI_CURR_BEST ]);
 	 m_pcRDGoOnSbacCoder->store( m_pppcRDSbacCoder[ uiDepth ][ CI_QT_TRAFO_ROOT ] );
+	 m_pcRDGoOnSbacCoder->load( m_pppcRDSbacCoder[ uiDepth ][ CI_QT_TRAFO_ROOT ] );
 	 m_pcEntropyCoder->resetBits();
 	 m_pcEntropyCoder->encodeCoeffNxN_MODIFY( pcCU,currentCoefficients, uiWidth,uiHeight,uiAbsPartIdx,CUListIndex,uiDepth,compID );
      currCompBits = m_pcEntropyCoder->getNumberOfWrittenBits();	 
+//	 m_pcRDGoOnSbacCoder->store( m_pppcRDSbacCoder[ uiDepth ][ CI_QT_TRAFO_ROOT ] );
+	 m_pcRDGoOnSbacCoder->store( m_pppcRDSbacCoder[ pcCU->getDepth( 0 ) ][ CI_TEMP_BEST ] );
 }
 #endif
 

@@ -305,6 +305,7 @@
 #define QP_FLUCT															   0 //piriter
 
 #define QP_MODIFY															   1 //piriter
+#define QP_DEBUG															   0 //piriter			
 #define DEBUG_PIRITER														   0 //piriter
 
 #if QP_MODIFY

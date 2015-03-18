@@ -1067,7 +1067,7 @@ Void  TEncCu::xperQPSelCu (      TComDataCU*& rpcBestCU,
 		{
 			Int FirstCUDepth=rpcBestCU->getDepth(CUListIndex);      //CU processing
 			Int ChromaCountflag=0;
-			if(rpcBestCU->getSkipFlag(CUListIndex)==true)
+			if((rpcBestCU->getSkipFlag(CUListIndex)==true)||(rpcBestCU->getCbf_MODIFY(0,COMPONENT_Y)==0))
 			{
 				CUListIndex+=g_ListIndexInc[FirstCUDepth];
 				continue;
@@ -1080,7 +1080,13 @@ Void  TEncCu::xperQPSelCu (      TComDataCU*& rpcBestCU,
 				{
 					Int FirstTUDepth=rpcBestCU->getTransformIdx(TUListIndex);
 					Int TUToatalDepth=FirstCUDepth+FirstTUDepth;
-					
+#if QP_DEBUG
+					if(TUToatalDepth==0)
+					{
+//						TUListIndex+=g_ListIndexInc[TUToatalDepth]; 
+//						continue;
+					}
+#endif					
 					//根据DepthSize选择相应的变换核进行量化，反量化和反变换
 					//set QP 32
 					Double     uiRDCost[3] = {0.0,};
@@ -1089,6 +1095,12 @@ Void  TEncCu::xperQPSelCu (      TComDataCU*& rpcBestCU,
 						const ComponentID compID=ComponentID(i);
 					    if((compID==COMPONENT_Y)||(TUListIndex==ChromaTUListIndex))
 						{
+#if QP_DEBUG
+							if(compID==2)
+							{
+//							  printf("hi");
+							}
+#endif
 							const QpParam cQP(*rpcBestCU, compID);
 							UInt  uiWidth=g_ListDepthSize[compID][TUToatalDepth];
 							UInt  uiHeight=g_ListDepthSize[compID][TUToatalDepth];
@@ -1104,7 +1116,7 @@ Void  TEncCu::xperQPSelCu (      TComDataCU*& rpcBestCU,
 							TCoeff TRcoeff[MAX_TU_SIZE * MAX_TU_SIZE];
 							TCoeff QTcoeff[MAX_TU_SIZE * MAX_TU_SIZE];
 							TCoeff AbsSum=0;
-							TCoeff* src=rpcBestCU->getTRCoeff(compID)+(TUListIndex*16>>(2*getComponentScaleX(compID,CHROMA_420)));    //chroma情况下？
+							TCoeff* src=rpcBestCU->getTRCoeff(compID)+(TUListIndex*16>>(2*getComponentScaleX(compID,CHROMA_420)));    
 							::memcpy(TRcoeff,src,sizeof(TCoeff)*uiWidth*uiHeight);
 							m_pcTrQuant->xQuant_MODIFY(rpcBestCU,TRcoeff,QTcoeff,AbsSum,CUListIndex,TUToatalDepth,compID,cQP);
 
@@ -1141,11 +1153,15 @@ Void  TEncCu::xperQPSelCu (      TComDataCU*& rpcBestCU,
 							//                           	  UInt         &currCompBits
 							//             )
 							UInt uiCompBits=0;
-							m_pcPredSearch->xEstimateBitRate(rpcBestCU,QTcoeff,uiWidth,uiHeight,TUListIndex,CUListIndex,TUToatalDepth,compID,uiCompBits);
+							if(QTcoeff[0]!=0)                                             //在色度码率评估过程中，量化系数可能全为0，虽然是nonbypass的情况下
+							{
+								m_pcPredSearch->xEstimateBitRate(rpcBestCU,QTcoeff,uiWidth,uiHeight,TUListIndex,CUListIndex,TUToatalDepth,compID,uiCompBits);
+							}
 
 							//rdCost
 							uiRDCost[compID]=m_pcRdCost->calcRdCost(uiCompBits, uiCompDist);
 							uiCompTotalCost[compID]+=uiRDCost[compID];
+/*
 							//重建
 							// rpcYuvRec->addClip ( pcYuvPred, rpcYuvResiBest, 0, uiWidth );
 							const Pel* pSrc0=m_ppcPredYuvBest[0]->getAddr(compID)+(TUListIndex*16>>(2*getComponentScaleX(compID,CHROMA_420))); //chroma
@@ -1162,6 +1178,7 @@ Void  TEncCu::xperQPSelCu (      TComDataCU*& rpcBestCU,
 								pSrc1 += uiStride;
 								pDst  += uiStride;
 							}
+*/
 						}
 					}							
 				TUListIndex+=g_ListIndexInc[TUToatalDepth];         //next TU
@@ -1198,7 +1215,7 @@ Void TEncCu::xUpdateCUContent(TComDataCU*& rpcBestCU,const UInt numValidComp)
 		{
 			Int FirstCUDepth=rpcBestCU->getDepth(CUListIndex);      //CU processing
 			Int ChromaCountflag=0;
-			if(rpcBestCU->getSkipFlag(CUListIndex)==true)
+			if((rpcBestCU->getSkipFlag(CUListIndex)==true)||(rpcBestCU->getCbf_MODIFY(0,COMPONENT_Y)==0))
 			{
 				CUListIndex+=g_ListIndexInc[FirstCUDepth];
 				continue;
@@ -1211,7 +1228,13 @@ Void TEncCu::xUpdateCUContent(TComDataCU*& rpcBestCU,const UInt numValidComp)
 				{
 					Int FirstTUDepth=rpcBestCU->getTransformIdx(TUListIndex);
 					Int TUToatalDepth=FirstCUDepth+FirstTUDepth;
-					
+#if QP_DEBUG
+					if(TUToatalDepth==0)
+					{
+//						TUListIndex+=g_ListIndexInc[TUToatalDepth]; 
+//						continue;
+					}
+#endif								
 					//根据DepthSize选择相应的变换核进行量化，反量化和反变换
 					//set QP 32
 					for(UInt i=0; i<numValidComp; i++)
@@ -1294,9 +1317,13 @@ Void TEncCu::xCuQPSel(TComDataCU*& rpcBestCU)
 	Double uiBestCost=MAX_DOUBLE;
 	Double uiTotalCost=0.0;
 	Double uiCompTotalCost[3]={0.0,};
-	Int    uiBestQP=32;
+	Int    uiBestQP_Anchor=rpcBestCU->getQP(0);
+	Int	   uiBestQP=uiBestQP_Anchor;
 	const UInt numValidComp = rpcBestCU->getPic()->getNumberValidComponents();
-    for(Int QPBase=25;QPBase<38;QPBase++)
+	Int    uiLowQP=uiBestQP-7;
+	Int    uiUpQP=uiBestQP+8;
+
+    for(Int QPBase=uiLowQP;QPBase<uiUpQP;QPBase++)
 	{
 		for(Int k=0;k<rpcBestCU->getTotalNumPart();k++)
 		{
@@ -1306,17 +1333,20 @@ Void TEncCu::xCuQPSel(TComDataCU*& rpcBestCU)
 	    for(UInt k=0; k<numValidComp; k++) 
     	{
     		uiTotalCost+=uiCompTotalCost[k];
+			uiCompTotalCost[k]=0;
      	}
     	 if(uiTotalCost<uiBestCost)
     	 {
 	       uiBestCost=uiTotalCost;
            uiBestQP=QPBase;
 	     }
+		 uiTotalCost=0.0;
    }
    for(Int k=0;k<rpcBestCU->getTotalNumPart();k++)
    {
 		rpcBestCU->setQP(k,uiBestQP);
-   }                                //CU Bset QP setting
+   }                                //CU Best QP setting
+
    xUpdateCUContent(rpcBestCU,numValidComp);
 }
 #endif
